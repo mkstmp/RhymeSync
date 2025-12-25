@@ -415,7 +415,7 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
             segments = json.load(f)
             
         compositor = VideoCompositor(config)
-        final_output = os.path.join(output_dir, "final_video.mp4")
+        final_output = os.path.join(output_dir, f"{poem_name}.mp4")
         compositor.create_video(segments, audio_file, final_output)
         
     click.echo("Done!")
