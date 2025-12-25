@@ -4,6 +4,7 @@ Pillow
 ffmpeg-python
 pyyaml
 pandas
+python-dotenv
 google-genai
 ftfy
 regex
