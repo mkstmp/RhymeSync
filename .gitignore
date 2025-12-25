@@ -1,0 +1,25 @@
+# System
+.DS_Store
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Project Specific
+output/
+inputs/
+*.mp4
+*.wav
+*.mp3
+# Keep sample poems? User said "skip input".
+# But config refers to poems/machhli.
+# I'll keep poems/ folder but maybe ignore large files if strictly requested?
+# User said "skip input/output". Usually means the working directories.
+# I will keep poems/ as it serves as 'examples'.
+
+# Keys
+key.json
+credentials.json

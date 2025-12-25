@@ -1,0 +1,23 @@
+project:
+  name: "RhymeSync Demo"
+  output_dir: "output"
+
+subject: "Cute 3D cartoon fish, underwater scene, vibrant colors, Pixar style"
+
+audio:
+  audio_input_file: "poems/machhli_jal_ki_rani_hai.wav"
+  lyrics_file: "poems/machhli_jal_ki_rani_hai.txt"
+
+video:
+  resolution: [1080, 1920] # 9:16 vertical
+  fps: 30
+
+whisper:
+  model: "small" # tiny, base, small, medium, large-v2
+
+imagen:
+  model: "imagen-4.0-generate-001" # or imagen-3.0-generate-001
+
+veo:
+  enabled: true # Set to true to use Video Generation instead of Image
+  model: "veo-2.0-generate-001"

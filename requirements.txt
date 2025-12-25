@@ -1,0 +1,11 @@
+click
+whisperx
+Pillow
+ffmpeg-python
+pyyaml
+pandas
+google-genai
+ftfy
+regex
+toolz
+matplotlib
