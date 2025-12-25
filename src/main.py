@@ -39,51 +39,71 @@ def load_config(config_path):
 @click.option('--step', type=click.Choice(['all', 'align', 'segment', 'direct', 'screenwrite', 'visualize', 'render', 'compose']), default='all', help='Execute specific step')
 @click.option('--run-id', default=None, help='Unique ID for this run (default: timestamp)')
 @click.option('--force', is_flag=True, help='Force re-execution of steps even if artifacts exist')
-def main(config_path, step, run_id, force):
-    """RhymeSync CLI: Create synchronized lyric videos."""
-    
-    if not os.path.exists(config_path):
-        click.echo(f"Config file not found: {config_path}")
-        return
+# Overrides
+@click.option('--audio', 'audio_override', help='Override audio_input_file')
+@click.option('--lyrics', 'lyrics_override', help='Override lyrics_file')
+@click.option('--subject', 'subject_override', help='Override subject prompt')
+def main(config_path, step, run_id, force, audio_override, lyrics_override, subject_override):
+    """
+    RhymeSync CLI - Automated Music Video Generator
+    """
+    # Load Config
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        click.echo(f"Loaded config from {config_path}")
+    else:
+        # Minimal fallbacks if config is missing but overrides are present
+        config = {"project": {"output_dir": "output"}, "audio": {}}
+        
+    # --- Apply Overrides ---
+    if audio_override:
+        if 'audio' not in config: config['audio'] = {}
+        config['audio']['audio_input_file'] = audio_override
+        click.echo(f"Override: Audio = {audio_override}")
+    if lyrics_override:
+        if 'audio' not in config: config['audio'] = {}
+        config['audio']['lyrics_file'] = lyrics_override
+        click.echo(f"Override: Lyrics = {lyrics_override}")
+    if subject_override:
+        config['subject'] = subject_override
+        click.echo(f"Override: Subject = {subject_override}")
 
-    config = load_config(config_path)
-    click.echo(f"Loaded config from {config_path}")
-    
-    # Paths
-    audio_file = config['audio'].get('audio_input_file') or config['audio'].get('input_file')
-    lyrics_file = config['audio']['lyrics_file']
-    base_output_dir = config['project']['output_dir']
-    
-    # Strict Input Validation
+    # Paths & Validation
+    audio_file = config.get('audio', {}).get('audio_input_file')
+    lyrics_file = config.get('audio', {}).get('lyrics_file')
     if not audio_file or not os.path.exists(audio_file):
-        click.echo(f"Error: Audio input file not found: {audio_file}")
+        click.echo(f"Error: Audio file not found: {audio_file}")
         return
     if not lyrics_file or not os.path.exists(lyrics_file):
         click.echo(f"Error: Lyrics file not found: {lyrics_file}")
         return
+
+    base_output_dir = config.get("project", {}).get("output_dir", "output")
     
-    # Derive poem name from lyrics filename (e.g. 'titli.txt' -> 'titli')
-    if lyrics_file and os.path.exists(lyrics_file):
-        poem_name = os.path.splitext(os.path.basename(lyrics_file))[0]
-    else:
-        # Fallback to audio filename if lyrics not found
-        poem_name = os.path.splitext(os.path.basename(audio_file))[0]
+    # Derive poem name
+    poem_name = os.path.splitext(os.path.basename(lyrics_file))[0]
     
-    # Generate Run ID if not provided
+    # Generate Run ID
     if not run_id:
         import datetime
         run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         
     output_dir = os.path.join(base_output_dir, poem_name, run_id)
+    os.makedirs(output_dir, exist_ok=True)
+    
     click.echo(f"Run ID: {run_id}")
     click.echo(f"Output Directory: {output_dir}")
     
+    # Save Effective Config
+    with open(os.path.join(output_dir, "run_config.yaml"), "w") as f:
+        yaml.dump(config, f)
+        
     # Ensure dirs
     os.makedirs(os.path.join(output_dir, "assets", "images"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "assets", "text"), exist_ok=True)
     
-    # Persistent State (to share data between steps if run independently)
-    # We'll save intermediate jsons to output_dir
+    # Persistent State Paths
     timestamps_path = os.path.join(output_dir, "timestamps.json")
     style_bible_path = os.path.join(output_dir, "style_bible.json")
     segments_path = os.path.join(output_dir, "segments.json")
