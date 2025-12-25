@@ -10,27 +10,27 @@ It leverages a chain of specialized AI agents to analyze lyrics, direct visual s
 
 ```mermaid
 graph TD
-    Input[Audio + Lyrics] --> Align[Step 1: Alignment<br/>(WhisperX)]
-    Align --> Refine[Step 1.5: Text Refiner<br/>(Correction Agent)]
-    Refine --> Direct[Step 2: The Director<br/>(Style Bible Agent)]
-    Direct --> Screen[Step 2.5: Screenwriter<br/>(Visual Descriptions)]
-    Screen --> Visual[Step 3: Visualizer<br/>(Prompt Engineering)]
+    Input["Audio + Lyrics"] --> Align["Step 1: Alignment<br/>(WhisperX)"]
+    Align --> Refine["Step 1.5: Text Refiner<br/>(Correction Agent)"]
+    Refine --> Direct["Step 2: The Director<br/>(Style Bible Agent)"]
+    Direct --> Screen["Step 2.5: Screenwriter<br/>(Visual Descriptions)"]
+    Screen --> Visual["Step 3: Visualizer<br/>(Prompt Engineering)"]
     
     style Input fill:#f9f,stroke:#333
     style Align fill:#bbf,stroke:#333
     style Final fill:#bfb,stroke:#333
 
-    Visual --> Switch{Config Mode?}
-    Switch -- Veo (Video) --> VeoGen[Google Veo 2.0]
-    Switch -- Imagen (Image) --> ImgGen[Google Imagen 3]
+    Visual --> Switch{"Config Mode?"}
+    Switch -- "Veo (Video)" --> VeoGen["Google Veo 2.0"]
+    Switch -- "Imagen (Image)" --> ImgGen["Google Imagen 3"]
     
-    VeoGen --> Assets[MP4 Clips]
-    ImgGen --> Assets[PNG Images]
+    VeoGen --> Assets["MP4 Clips"]
+    ImgGen --> Assets["PNG Images"]
     
-    Assets --> Compose[Step 5: Compositor<br/>(FFmpeg)]
+    Assets --> Compose["Step 5: Compositor<br/>(FFmpeg)"]
     Align --> Compose
     
-    Compose --> Final[Final Video<br/>(.mp4)]
+    Compose --> Final["Final Video<br/>(.mp4)"]
 ```
 
 ## ✨ Key Features
