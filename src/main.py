@@ -29,6 +29,7 @@ from src.agents.visualizer import VisualizerAgent
 from src.visuals.generator import ImageGenerator
 from src.visuals.text_renderer import TextRenderer
 from src.video.compositor import VideoCompositor
+from src.utils.subtitle import generate_srt
 
 def load_config(config_path):
     with open(config_path, 'r') as f:
@@ -414,9 +415,18 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
         with open(segments_path, "r") as f:
             segments = json.load(f)
             
-        compositor = VideoCompositor(config)
-        final_output = os.path.join(output_dir, f"{poem_name}.mp4")
-        compositor.create_video(segments, audio_file, final_output)
+        compositor = VideoCompositor(config)        # Output path
+        final_output_path = os.path.join(output_dir, f"{poem_name}.mp4")
+        
+        compositor.create_video(segments, audio_file, final_output_path)
+        click.echo(f"Video Render Complete: {final_output_path}")
+        
+        # Generate Subtitles
+        srt_content = generate_srt(segments)
+        srt_path = os.path.join(output_dir, f"{poem_name}.srt")
+        with open(srt_path, "w") as f:
+            f.write(srt_content)
+        click.echo(f"Subtitles Generated: {srt_path}")
         
     click.echo("Done!")
 

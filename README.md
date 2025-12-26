@@ -42,6 +42,7 @@ graph TD
 - **🎥 Google Veo Integration**: Generates consistent, high-fidelity 1080p vertical video clips (`veo-2.0-generate-001`).
 - **🖼️ Imagen Support**: Fallback to static images with Ken Burns effects.
 - **⚡ Perfect Sync**: Uses **WhisperX** for word-level alignment ensuring visuals hit exactly on the beat.
+- **📝 Automatic Subtitles**: Generates `.srt` files for YouTube captions.
 - **🚀 Production Ready**:
   - **CLI Overrides**: Switch inputs dynamically.
   - **Checkpointing**: Resume run from any step.
