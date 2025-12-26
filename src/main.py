@@ -30,6 +30,7 @@ from src.visuals.generator import ImageGenerator
 from src.visuals.text_renderer import TextRenderer
 from src.video.compositor import VideoCompositor
 from src.utils.subtitle import generate_srt
+from src.agents.marketing import MarketingAgent
 
 def load_config(config_path):
     with open(config_path, 'r') as f:
@@ -428,6 +429,27 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
             f.write(srt_content)
         click.echo(f"Subtitles Generated: {srt_path}")
         
+        # Generate YouTube Metadata
+        click.echo("Generating YouTube Metadata...")
+        try:
+            marketing_agent = MarketingAgent()
+            
+            # Read lyrics
+            raw_lyrics = ""
+            if os.path.exists(lyrics_file):
+                with open(lyrics_file, "r") as f:
+                    raw_lyrics = f.read()
+            
+            meta_content = marketing_agent.generate_metadata(raw_lyrics, config.get("subject", ""), poem_name)
+            
+            if meta_content:
+                meta_path = os.path.join(output_dir, f"{poem_name}_metadata.txt")
+                with open(meta_path, "w") as f:
+                    f.write(meta_content)
+                click.echo(f"Metadata Generated: {meta_path}")
+        except Exception as e:
+            click.echo(f"Warning: Metadata generation failed: {e}")
+            
     click.echo("Done!")
 
 if __name__ == "__main__":
