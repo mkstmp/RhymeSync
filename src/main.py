@@ -416,6 +416,21 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
         with open(segments_path, "r") as f:
             segments = json.load(f)
             
+        # Validate Assets
+        missing_assets = []
+        for i, seg in enumerate(segments):
+            if seg.get("type") == "lyrics":
+                asset_path = seg.get("asset_path")
+                if not asset_path or not os.path.exists(asset_path):
+                    missing_assets.append(f"Segment {i+1} (Text: {seg.get('text', '')[:30]}...)")
+        
+        if missing_assets:
+            click.echo("Error: Cannot compose video. Missing assets for the following segments:")
+            for msg in missing_assets:
+                click.echo(f"  - {msg}")
+            click.echo("Please check your 'visualize' step output and re-run.")
+            return
+            
         compositor = VideoCompositor(config)        # Output path
         final_output_path = os.path.join(output_dir, f"{poem_name}.mp4")
         
