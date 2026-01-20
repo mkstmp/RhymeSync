@@ -331,7 +331,7 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
         
         # Determine if Veo is enabled
         use_veo = config.get("veo", {}).get("enabled", False)
-        veo_model = config.get("veo", {}).get("model", "veo-2.0-generate-001")
+        veo_model = config.get("veo", {}).get("model", "veo-3.1-generate-001")
         
         # Create output directory for assets
         images_dir = os.path.join(output_dir, "assets", "images")

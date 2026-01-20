@@ -20,4 +20,4 @@ imagen:
 
 veo:
   enabled: true # Set to true to use Video Generation instead of Image
-  model: "veo-2.0-generate-001"
+  model: "veo-3.1-generate-001"

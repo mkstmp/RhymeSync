@@ -21,7 +21,7 @@ graph TD
     style Final fill:#bfb,stroke:#333
 
     Visual --> Switch{"Config Mode?"}
-    Switch -- "Veo (Video)" --> VeoGen["Google Veo 2.0"]
+    Switch -- "Veo (Video)" --> VeoGen["Google Veo 3.1"]
     Switch -- "Imagen (Image)" --> ImgGen["Google Imagen 3"]
     
     VeoGen --> Assets["MP4 Clips"]
@@ -39,7 +39,7 @@ graph TD
   - **Director**: Establishes a consistent "Style Bible" (e.g., Pixar, Cyberpunk, Watercolor).
   - **Screenwriter**: Translates poetic lyrics into concrete visual scene descriptions.
   - **Visualizer**: Optimizes prompts for specific generative models.
-- **🎥 Google Veo Integration**: Generates consistent, high-fidelity 1080p vertical video clips (`veo-2.0-generate-001`).
+- **🎥 Google Veo Integration**: Generates consistent, high-fidelity 1080p vertical video clips (`veo-3.1-generate-001`).
 - **🖼️ Imagen Support**: Fallback to static images with Ken Burns effects.
 - **⚡ Perfect Sync**: Uses **WhisperX** for word-level alignment ensuring visuals hit exactly on the beat.
 - **📝 Automatic Subtitles**: Generates `.srt` files for YouTube captions.
@@ -76,7 +76,7 @@ Enable Veo in `config.yaml` or use the flag overrides.
 # config.yaml
 veo:
   enabled: true
-  model: "veo-2.0-generate-001"
+  model: "veo-3.1-generate-001"
 ```
 
 ### 3. CLI Overrides (Switch Inputs Quickly)
