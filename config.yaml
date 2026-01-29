@@ -21,7 +21,7 @@ whisper:
 
 alignment:
   method: "gemini" # Options: "whisper", "gemini"
-  model: "gemini-2.0-flash" # Used if method is gemini
+  model: "gemini-2.5-pro" # "Top Choice for Accuracy & Detail" - Switching for best quality.
 
 imagen:
   model: "gemini-3-pro-image-preview" # Using advanced Gemini 3 model (supported via generate_content)
