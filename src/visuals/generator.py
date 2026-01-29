@@ -20,37 +20,102 @@ class ImageGenerator:
     def generate_image(self, prompt, output_path, aspect_ratio="9:16"):
         """
         Generates an image and saves it to output_path.
+        Supports both 'imagen' models (via generate_images) and 'gemini' models (via generate_content).
         """
         print(f"Generating image for prompt: {prompt[:50]}...")
         
         try:
-            response = self.client.models.generate_images(
-                model=self.model_name,
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio=aspect_ratio,
-                    safety_filter_level="block_low_and_above",
-                    person_generation="allow_adult"
+            # Path 1: Gemini 3 Unified Endpoint (generating text + image)
+            if "gemini" in self.model_name.lower():
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        # key parameter for Gemini 3 image generation
+                        response_modalities=['TEXT', 'IMAGE'], 
+                        image_config=types.ImageConfig(
+                            aspect_ratio=aspect_ratio,
+                            image_size="1K" # Defaulting to 1K for now
+                        ),
+                        # Safety settings might differ, keeping generic or relying on defaults
+                    )
                 )
-            )
-            
-            if response.generated_images:
-                # Save first image
-                image = response.generated_images[0].image
-                image.save(output_path)
-                print(f"Saved image to {output_path}")
-                return True
+                
+                # Extract image from parts
+                image_saved = False
+                if response.parts:
+                    for part in response.parts:
+                        # Check for inline image (as_image() returns PIL Image if present)
+                        # The SDK might expose it as `part.image` or process inline_data
+                        # Based on docs: part.as_image()
+                        try:
+                            # Try modern SDK helper if available
+                            if hasattr(part, 'as_image'):
+                                img = part.as_image()
+                                if img:
+                                    img.save(output_path)
+                                    print(f"Saved image to {output_path}")
+                                    image_saved = True
+                                    break
+                            
+                            # Fallback checks (inline_data)
+                            if hasattr(part, 'inline_data') and part.inline_data:
+                                from PIL import Image as PILImage
+                                import io
+                                import base64
+                                # It might be raw bytes or base64. SDK usually handles this in as_image
+                                # but manual fallback:
+                                img_data = part.inline_data.data
+                                if img_data:
+                                    img = PILImage.open(io.BytesIO(img_data))
+                                    img.save(output_path)
+                                    print(f"Saved image to {output_path}")
+                                    image_saved = True
+                                    break
+                        except Exception as part_err:
+                            print(f"Error extracting image part: {part_err}")
+                
+                if image_saved:
+                    return True
+                else:
+                    print(f"No image found in Gemini response. Parts: {len(response.parts) if response.parts else 0}")
+                    # If text was returned, print it
+                    if response.text:
+                        print(f"Gemini returned text instead: {response.text[:100]}...")
+                    return False
+
+            # Path 2: Legacy Imagen Endpoint
             else:
-                print(f"No images returned. Response: {response}")
-                return False
+                response = self.client.models.generate_images(
+                    model=self.model_name,
+                    prompt=prompt,
+                    config=types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio=aspect_ratio,
+                        safety_filter_level="block_low_and_above",
+                        person_generation="allow_adult"
+                    )
+                )
+                
+                if response.generated_images:
+                    # Save first image
+                    image = response.generated_images[0].image
+                    image.save(output_path)
+                    print(f"Saved image to {output_path}")
+                    return True
+                else:
+                    print(f"No images returned. Response: {response}")
+                    return False
                 
         except Exception as e:
             print(f"Error generating image: {e}")
             # Mocking for now if API fails
             print("MOCK: Creating a placeholder image due to API error/unavailability.")
-            img = Image.new('RGB', (1080, 1920), color = 'red')
-            img.save(output_path)
+            try:
+                img = Image.new('RGB', (1080, 1920), color = 'red')
+                img.save(output_path)
+            except:
+                pass 
             return True
 
 

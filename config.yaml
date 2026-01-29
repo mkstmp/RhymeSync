@@ -20,7 +20,7 @@ whisper:
   language: "hi" # Force language code (e.g., "hi", "en"). Remove or leave empty for auto-detection.
 
 imagen:
-  model: "imagen-4.0-fast-generate-001" # Reverting to confirmed working model. Safety blocks fixed via sanitization.
+  model: "gemini-3-pro-image-preview" # Using advanced Gemini 3 model (supported via generate_content)
 
 veo:
   enabled: true # Set to true to use Video Generation instead of Image
