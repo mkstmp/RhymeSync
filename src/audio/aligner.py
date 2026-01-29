@@ -74,17 +74,12 @@ class AudioAligner:
         Audio File: [Attached]
         Transcript Context: "{lyrics_text}"
         
-        Output Format: JSON list of objects.
-        Each object must have:
-        - "word": The word or phrase segment (keep it granular).
-        - "start": Start time in seconds (float).
-        - "end": End time in seconds (float).
+        Output Format: JSON list of lists. Minified (no whitespace/newlines).
+        [ ["word", start, end], ["word", start, end] ]
         
         Rules:
         - Cover the ENTIRE audio duration accurately.
-        - Provide word-level timestamps.
-        - Ensure timestamp accuracy.
-        - Output ONLY the raw JSON string. Do not use markdown blocks.
+        - Output ONLY the raw JSON string. NO Markdown. NO whitespace.
         """
 
         print("Sending request to Gemini...")
@@ -93,44 +88,87 @@ class AudioAligner:
                 model=self.gemini_model,
                 contents=[prompt, audio_file],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
+                    response_mime_type="application/json",
+                    max_output_tokens=8192
                 )
             )
             
             if response.text:
+                text = response.text.strip()
+                if text.startswith("```json"): text = text[7:]
+                if text.startswith("```"): text = text[3:]
+                if text.endswith("```"): text = text[:-3]
+                text = text.strip()
+
                 try:
-                    # Clean markdown code blocks if present (though prompt says not to)
-                    text = response.text.strip()
-                    if text.startswith("```json"): text = text[7:]
-                    if text.startswith("```"): text = text[3:]
-                    if text.endswith("```"): text = text[:-3]
-                    
                     data = json.loads(text)
+                except json.JSONDecodeError as e:
+                    print(f"Warning: JSON Decode Error ({e}). Attempting repair...")
+                    # Repair strategy: Find last closing bracket of an inner list ']', cut off, and close.
+                    # Assuming format [[...], [...], ...]
+                    last_bracket = text.rfind(']')
+                    if last_bracket != -1:
+                        # If string ends with something like '], ["partial...', we want the last ']' from a COMPLETE item.
+                        # We look for '], [' pattern or just ']' at end of a valid item. 
+                        # Using rfind(']') might find the partial one if it existed?
+                        # Safer: iterate or regex.
+                        # Simple heuristic: rfind(']') is risky if inside string. 
+                        # But in minified JSON, ']' usually means end of list.
+                        
+                        # Let's try to find the last occurrence of '],[' or sequence that implies separation
+                        # Actually, if we just cut at last ']', append ']', it might work if the truncation wasn't inside a list.
+                        # If truncation was inside a string inside a list, last ']' is the previous item's end.
+                        
+                        # Fix: Trim to last ']', then add ']' to close outer list.
+                        # Be careful if text[last_bracket] is the closing of the *outer* list (unlikely if error).
+                        
+                        # Iterate backwards to find a safe cut point.
+                        # We expect pairs of brackets.
+                        # Regex for valid inner list: \[ ".*?", \d+(\.\d+)?, \d+(\.\d+)? \]
+                        import re
+                        # Find all valid inner lists
+                        matches = re.findall(r'\[\s*".*?"\s*,\s*[\d\.]+\s*,\s*[\d\.]+\s*\]', text)
+                        if matches:
+                            print(f"Recovered {len(matches)} valid segments from truncated JSON.")
+                            # Reconstruct valid JSON
+                            fixed_json = "[" + ",".join(matches) + "]"
+                            data = json.loads(fixed_json)
+                        else:
+                            print("Could not repair JSON.")
+                            raise e
+                    else:
+                        raise e
                     
-                    # Normalize keys just in case
-                    aligned_words = []
-                    for item in data:
-                        # Handle potential key variations from LLM
+                # Convert list-of-lists to list-of-dicts
+                aligned_words = []
+                for item in data:
+                    if isinstance(item, list) and len(item) >= 3:
+                        word = item[0]
+                        start = item[1]
+                        end = item[2]
+                        aligned_words.append({
+                            "word": str(word),
+                            "start": float(start),
+                            "end": float(end),
+                            "score": 1.0 
+                        })
+                    elif isinstance(item, dict):
+                        # Fallback if model ignores instruction and outputs dicts
                         word = item.get("word") or item.get("text")
                         start = item.get("start")
                         end = item.get("end")
-                        if word is not None and start is not None and end is not None:
+                        if word is not None:
                             aligned_words.append({
                                 "word": str(word),
                                 "start": float(start),
                                 "end": float(end),
-                                "score": 1.0 # Gemini doesn't give confidence scores usually
+                                "score": 1.0
                             })
-                            
-                    print(f"Gemini alignment complete. {len(aligned_words)} segments found.")
-                    return aligned_words
+                        
+                print(f"Gemini alignment complete. {len(aligned_words)} segments found.")
+                return aligned_words
                     
-                except json.JSONDecodeError:
-                    print(f"Error decoding JSON from Gemini: {response.text}")
-                    raise
-            else:
-                 print("Empty response from Gemini.")
-                 return []
+
 
         except Exception as e:
             print(f"Error during Gemini Alignment: {e}")
