@@ -19,6 +19,10 @@ whisper:
   model: "small" # tiny, base, small, medium, large-v2
   language: "hi" # Force language code (e.g., "hi", "en"). Remove or leave empty for auto-detection.
 
+alignment:
+  method: "gemini" # Options: "whisper", "gemini"
+  model: "gemini-2.0-flash" # Used if method is gemini
+
 imagen:
   model: "gemini-3-pro-image-preview" # Using advanced Gemini 3 model (supported via generate_content)
 
