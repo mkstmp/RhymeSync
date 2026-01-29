@@ -15,7 +15,9 @@ class VisualizerAgent:
         visual_desc = kwargs.get("visual_description", "")
         
         # Sanitize character description for safety (remove specific ages)
-        character_desc = character_desc.replace("5-year-old", "young").replace("6-year-old", "young").replace("child", "character")
+        # Sanitize character description for safety (remove specific ages and child terms)
+        for term in ["5-year-old", "6-year-old", "child", "kid", "boy", "girl", "toddler", "baby"]:
+            character_desc = character_desc.replace(term, "young character")
         
         prompt = f"""
         You are the Visualizer for a music video.
