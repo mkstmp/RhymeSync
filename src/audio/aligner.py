@@ -38,8 +38,11 @@ class AudioAligner:
         model_size = whisper_config.get("model", "medium") if isinstance(whisper_config, dict) else "medium"
         model = whisperx.load_model(model_size, self.device, compute_type=self.compute_type)
         
-        print("Transcribing...")
-        result = model.transcribe(audio, batch_size=16)
+        # Get language from config
+        language = whisper_config.get("language", None)
+        
+        print(f"Transcribing... (Language forced: {language})" if language else "Transcribing... (Auto-detection)")
+        result = model.transcribe(audio, batch_size=16, language=language)
         
         # 2. Align
         print("Loading Alignment model...")

@@ -2,7 +2,7 @@ import json
 from src.utils.llm import GeminiClient
 
 class ScreenwriterAgent:
-    def __init__(self, model_name="gemini-2.0-flash-exp"):
+    def __init__(self, model_name="gemini-3-flash-preview"):
         self.llm = GeminiClient(model_name=model_name)
 
     def enrich_segments(self, segments, style_bible):

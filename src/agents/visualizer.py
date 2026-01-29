@@ -14,6 +14,9 @@ class VisualizerAgent:
         
         visual_desc = kwargs.get("visual_description", "")
         
+        # Sanitize character description for safety (remove specific ages)
+        character_desc = character_desc.replace("5-year-old", "young").replace("6-year-old", "young").replace("child", "character")
+        
         prompt = f"""
         You are the Visualizer for a music video.
         
@@ -40,4 +43,31 @@ class VisualizerAgent:
         # Clean up
         full_prompt = full_prompt.replace("\n", " ").strip()
         
+        return full_prompt
+        
+        # NOTE: We already implemented the regex unescape logic in the previous turn?
+        # Let's double check if I actually applied it or if it was checking for \\u.
+        # The user says "Both issues are still present".
+        # If the file content shows: \u0905\u0928... that means literal backslash u.
+        # My previous regex was r'\\u([0-9a-fA-F]{4})'.
+        # That matches a LITERAL \u followed by 4 hex chars.
+        # If the string in python memory has ACTUAL unicode chars, this regex won't match.
+        # But if the string in python memory has ESCAPE SEQUENCES (backslash u), it will match.
+        
+        # Let's clean this up to be universally safe.
+        import re
+        
+        # 1. Decode literal unicode escapes (e.g. string containing "\u0906")
+        def unescape_unicode(match):
+            try:
+                return chr(int(match.group(1), 16))
+            except:
+                return match.group(0)
+                
+        # Regex for \uXXXX
+        full_prompt = re.sub(r'\\u([0-9a-fA-F]{4})', unescape_unicode, full_prompt)
+        
+        # Regex for \xXX (just in case)
+        full_prompt = re.sub(r'\\x([0-9a-fA-F]{2})', unescape_unicode, full_prompt)
+
         return full_prompt

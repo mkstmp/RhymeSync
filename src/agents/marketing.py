@@ -2,8 +2,8 @@ from src.utils.llm import GeminiClient
 import json
 
 class MarketingAgent:
-    def __init__(self):
-        self.llm = GeminiClient()
+    def __init__(self, model_name="gemini-3-flash-preview"):
+        self.llm = GeminiClient(model_name=model_name)
 
     def generate_metadata(self, lyrics, subject, poem_name):
         print("Marketing Agent: Generating YouTube Metadata...")

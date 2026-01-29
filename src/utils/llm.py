@@ -56,7 +56,23 @@ class GeminiClient:
                 contents=prompt,
                 config=config
             )
-            return response.text
+            
+            # Robust text extraction to avoid "thought_signature" or other non-text parts pollution
+            if not response.candidates:
+                return None
+                
+            candidate = response.candidates[0]
+            if not candidate.content or not candidate.content.parts:
+                return None
+                
+            text_parts = []
+            for part in candidate.content.parts:
+                # Check for direct 'text' attribute
+                if hasattr(part, 'text') and part.text:
+                    text_parts.append(part.text)
+            
+            return "".join(text_parts).strip()
+            
         except Exception as e:
             print(f"Error generating content: {e}")
             return None

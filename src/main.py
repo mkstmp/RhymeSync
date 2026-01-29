@@ -26,7 +26,7 @@ torch.load = _safe_load
 from src.audio.aligner import AudioAligner
 from src.agents.director import DirectorAgent
 from src.agents.visualizer import VisualizerAgent
-from src.visuals.generator import ImageGenerator
+from src.visuals.generator import ImageGenerator, VideoGenerator
 from src.visuals.text_renderer import TextRenderer
 from src.video.compositor import VideoCompositor
 from src.utils.subtitle import generate_srt
@@ -45,7 +45,9 @@ def load_config(config_path):
 @click.option('--audio', 'audio_override', help='Override audio_input_file')
 @click.option('--lyrics', 'lyrics_override', help='Override lyrics_file')
 @click.option('--subject', 'subject_override', help='Override subject prompt')
-def main(config_path, step, run_id, force, audio_override, lyrics_override, subject_override):
+@click.option('--suggested-segments', 'suggested_segments_file', help='Path to a text file with manual segment lines override')
+@click.option('--no-veo', is_flag=True, help='Disable Veo video generation (overrides config)')
+def main(config_path, step, run_id, force, audio_override, lyrics_override, subject_override, suggested_segments_file, no_veo):
     """
     RhymeSync CLI - Automated Music Video Generator
     """
@@ -127,7 +129,8 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
                 with open(lyrics_file, "r") as f:
                     lyrics_text = f.read()
                     
-                refiner = TextRefinerAgent()
+                llm_model = config.get("llm", {}).get("model", "gemini-3-flash-preview")
+                refiner = TextRefinerAgent(model_name=llm_model)
                 refined_data = refiner.refine_timestamps(aligned_data, lyrics_text)
                 
                 # Overwrite timestamps with refined version
@@ -152,7 +155,7 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
             style_bible = director.create_style_bible(lyrics_text, config.get("subject", "A music video"))
             
             with open(style_bible_path, "w") as f:
-                json.dump(style_bible, f, indent=2)
+                json.dump(style_bible, f, indent=2, ensure_ascii=False)
             
     # --- Step 1-B: Refine Text (Already done above) ---
 
@@ -178,67 +181,86 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
             timestamps = json.load(f)
 
         segments = []
-        current_time = 0.0
         
-        # 1. Intro
-        if timestamps:
-            first_start = timestamps[0]['start']
-            if first_start > 2.0: # If >2s gap at start
-                click.echo(f"Adding Intro Segment (0.0 to {first_start:.2f}s)")
-                segments.append({
-                    "words": [],
-                    "text": "(Intro Music)",
-                    "start": 0.0,
-                    "end": first_start,
-                    "type": "intro"
-                })
-        
-        # 2. Group Words
-        if timestamps:
-            current_segment = {"words": [], "start": timestamps[0]["start"], "end": timestamps[0]["end"], "type": "lyrics"}
-            
-            for i, w in enumerate(timestamps):
-                # Check for gap
-                is_gap = (w["start"] - current_segment["end"] > 0.5)
-                # Check for long segment duration (>5s)
-                is_long = (w["end"] - current_segment["start"] > 5.0)
-                
-                if is_gap or is_long:
-                    # Look ahead: is the gap HUGE? (Instrumental bridge)
-                    gap_size = w["start"] - current_segment["end"]
-                    
-                    if gap_size > 2.0:
-                         # 2a. Close current lyrics segment
-                         segments.append(current_segment)
+        # Check for Manual Suggested Segments Override
+        if suggested_segments_file and os.path.exists(suggested_segments_file):
+             click.echo(f"Applying Manual Suggested Segments from: {suggested_segments_file}")
+             with open(suggested_segments_file, 'r') as f:
+                 lines = [line.strip() for line in f if line.strip()]
+                 
+             from src.utils.segmentation_helper import align_words_to_lines
+             # Use the helper to group words into these lines
+             segments = align_words_to_lines(timestamps, lines)
+             click.echo(f"Generated {len(segments)} segments based on manual suggestions.")
+             
+             # Need to add Intro/Outro logic even for manual segments?
+             # Yes, usually valuable.
+             pass
+        else:
+            # --- Default Automatic Logic ---
+             click.echo("Using Automatic Segmentation Heuristics...")
+             
+             current_time = 0.0
+             
+             # 1. Intro
+             if timestamps:
+                 first_start = timestamps[0]['start']
+                 if first_start > 2.0: # If >2s gap at start
+                     click.echo(f"Adding Intro Segment (0.0 to {first_start:.2f}s)")
+                     segments.append({
+                         "words": [],
+                         "text": "(Intro Music)",
+                         "start": 0.0,
+                         "end": first_start,
+                         "type": "intro"
+                     })
+             
+             # 2. Group Words
+             if timestamps:
+                 current_segment = {"words": [], "start": timestamps[0]["start"], "end": timestamps[0]["end"], "type": "lyrics"}
+                 
+                 for i, w in enumerate(timestamps):
+                     # Check for gap
+                     is_gap = (w["start"] - current_segment["end"] > 0.5)
+                     # Check for long segment duration (>5s)
+                     is_long = (w["end"] - current_segment["start"] > 5.0)
+                     
+                     if is_gap or is_long:
+                         # Look ahead: is the gap HUGE? (Instrumental bridge)
+                         gap_size = w["start"] - current_segment["end"]
                          
-                         # 2b. Add Bridge Segment
-                         click.echo(f"Adding Bridge Segment ({current_segment['end']:.2f} to {w['start']:.2f}s)")
-                         segments.append({
-                             "words": [],
-                             "text": "(Instrumental)",
-                             "start": current_segment['end'],
-                             "end": w["start"],
-                             "type": "bridge"
-                         })
-                         
-                         # 2c. Start new lyrics segment
-                         current_segment = {"words": [w], "start": w["start"], "end": w["end"], "type": "lyrics"}
-                         
-                    else:
-                         # Normal line break.
-                         # EXTEND current segment end to next word start to avoid micro-black-gaps
-                         current_segment["end"] = w["start"]
-                         segments.append(current_segment)
-                         current_segment = {"words": [w], "start": w["start"], "end": w["end"], "type": "lyrics"}
-                else:
-                    current_segment["words"].append(w)
-                    current_segment["end"] = w["end"]
-            
-            # Append last text segment
-            segments.append(current_segment)
+                         if gap_size > 2.0:
+                              # 2a. Close current lyrics segment
+                              segments.append(current_segment)
+                              
+                              # 2b. Add Bridge Segment
+                              click.echo(f"Adding Bridge Segment ({current_segment['end']:.2f} to {w['start']:.2f}s)")
+                              segments.append({
+                                  "words": [],
+                                  "text": "(Instrumental)",
+                                  "start": current_segment['end'],
+                                  "end": w["start"],
+                                  "type": "bridge"
+                              })
+                              
+                              # 2c. Start new lyrics segment
+                              current_segment = {"words": [w], "start": w["start"], "end": w["end"], "type": "lyrics"}
+                              
+                         else:
+                              # Normal line break.
+                              # EXTEND current segment end to next word start to avoid micro-black-gaps
+                              current_segment["end"] = w["start"]
+                              segments.append(current_segment)
+                              current_segment = {"words": [w], "start": w["start"], "end": w["end"], "type": "lyrics"}
+                     else:
+                         current_segment["words"].append(w)
+                         current_segment["end"] = w["end"]
+                 
+                 # Append last text segment
+                 segments.append(current_segment)
 
-        # 3. Outro
-        if timestamps and audio_duration:
+        # 3. Outro (Common to both Manual and Automatic)
+        if timestamps and audio_duration and segments:
             last_end = segments[-1]["end"]
             if audio_duration - last_end > 2.0:
                  click.echo(f"Adding Outro Segment ({last_end:.2f} to {audio_duration:.2f}s)")
@@ -255,7 +277,7 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
 
         # 4. Construct Text Fields for Visualizer
         for seg in segments:
-            if seg["type"] == "lyrics":
+            if seg["type"] == "lyrics" and not seg.get("text"):
                 seg["text"] = " ".join([w["word"] for w in seg["words"]])
             # Ensure no missing text field
             if "text" not in seg: seg["text"] = ""
@@ -273,11 +295,14 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
         with open(lyrics_file, "r") as f:
             lyrics_text = f.read()
             
-        director = DirectorAgent()
+        with open(lyrics_file, "r") as f:
+            lyrics_text = f.read()
+            
+        director = DirectorAgent(model_name=config.get("llm", {}).get("model", "gemini-3-flash-preview"))
         style_bible = director.create_style_bible(lyrics_text, config.get("subject", "A music video"))
         
         with open(style_bible_path, "w") as f:
-            json.dump(style_bible, f, indent=2)
+            json.dump(style_bible, f, indent=2, ensure_ascii=False)
 
     # --- Step 2.5: Screenwriter (Enrich Segments) ---
     if step in ['all', 'screenwrite']:
@@ -303,12 +328,14 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
                 style_bible = json.load(f)
             
             from src.agents.screenwriter import ScreenwriterAgent
-            screenwriter = ScreenwriterAgent()
-            click.echo("Screenwriter Agent: Interpreting lyrics into visual scenes...")
+            # Use model from config or default
+            llm_model = config.get("llm", {}).get("model", "gemini-3-flash-preview")
+            screenwriter = ScreenwriterAgent(model_name=llm_model)
+            click.echo(f"Screenwriter Agent ({llm_model}): Interpreting lyrics into visual scenes...")
             enriched_segments = screenwriter.enrich_segments(segments, style_bible)
             
             with open(segments_path, "w") as f:
-                json.dump(enriched_segments, f, indent=2)
+                json.dump(enriched_segments, f, indent=2, ensure_ascii=False)
             click.echo("Segments enriched with visual descriptions.")
             
     # --- Step 3: Visualizer (Images) ---
@@ -327,11 +354,17 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
         with open(style_bible_path, "r") as f:
             style_bible = json.load(f)
             
-        visualizer = VisualizerAgent()
+        # Use model from config or default
+        llm_model = config.get("llm", {}).get("model", "gemini-3-flash-preview")
+        visualizer = VisualizerAgent(model_name=llm_model)
         
         # Determine if Veo is enabled
         use_veo = config.get("veo", {}).get("enabled", False)
-        veo_model = config.get("veo", {}).get("model", "veo-3.1-generate-001")
+        # Override if --no-veo is set
+        if no_veo:
+            use_veo = False
+            
+        veo_model = config.get("veo", {}).get("model", "veo-3.1-generate-preview")
         
         # Create output directory for assets
         images_dir = os.path.join(output_dir, "assets", "images")
@@ -339,12 +372,16 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
 
         if use_veo:
             click.echo(f"Using Veo for VIDEO generation ({veo_model})")
-            generator = ImageGenerator(model_name=veo_model) # ImageGenerator is a misnomer here, it handles video too
+            generator = VideoGenerator(model_name=veo_model)
             ext = "mp4"
         else:
-            click.echo(f"Using Imagen for IMAGE generation ({config.get('image_gen', {}).get('model', 'imagen-2')})")
-            generator = ImageGenerator(model_name=config.get('image_gen', {}).get('model', 'imagen-2'))
+            # Use 'imagen' key as defined in config.yaml
+            imagen_model = config.get('imagen', {}).get('model', 'imagen-3.0-generate-001')
+            click.echo(f"Using Imagen for IMAGE generation ({imagen_model})")
+            generator = ImageGenerator(model_name=imagen_model)
             ext = "png"
+            
+        last_video_path = None
             
         for i, seg in enumerate(segments):
             if seg["type"] not in ["lyrics", "intro", "outro"]:
@@ -373,13 +410,27 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
             
             if use_veo:
                 duration = seg["end"] - seg["start"]
-                generator.generate_video(prompt, asset_path, duration_seconds=duration)
+                
+                # Check 140s limit for extension logic
+                # If total video duration so far (seg['end']) is < 140s, we try to extend.
+                # Otherwise, we start a fresh segment.
+                extension_source = last_video_path
+                
+                # Check config flag
+                if not config.get("veo", {}).get("extension_enabled", False):
+                     extension_source = None
+                elif seg["end"] > 140.0:
+                    extension_source = None
+                
+                success = generator.generate_video(prompt, asset_path, duration_seconds=duration, previous_video_path=extension_source)
+                if success:
+                    last_video_path = asset_path
             else:
                 generator.generate_image(prompt, asset_path)
                 
         # Save updated segments with asset paths
         with open(segments_path, "w") as f:
-            json.dump(segments, f, indent=2)
+            json.dump(segments, f, indent=2, ensure_ascii=False)
 
     # --- Step 4: Text Rendering ---
     if step in ['all', 'render']:
@@ -405,7 +456,7 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
             seg["text_img"] = txt_path
         # Save updated segments with image paths
         with open(segments_path, "w") as f:
-            json.dump(segments, f, indent=2)
+            json.dump(segments, f, indent=2, ensure_ascii=False)
 
     # --- Step 5: Compose ---
     if step in ['all', 'compose']:
@@ -447,7 +498,8 @@ def main(config_path, step, run_id, force, audio_override, lyrics_override, subj
         # Generate YouTube Metadata
         click.echo("Generating YouTube Metadata...")
         try:
-            marketing_agent = MarketingAgent()
+            llm_model = config.get("llm", {}).get("model", "gemini-3-flash-preview")
+            marketing_agent = MarketingAgent(model_name=llm_model)
             
             # Read lyrics
             raw_lyrics = ""

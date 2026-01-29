@@ -4,6 +4,9 @@ project:
 
 subject: "Cute 3D cartoon fish, underwater scene, vibrant colors, Pixar style"
 
+llm:
+  model: "gemini-3-flash-preview" # Updated from gemini-2.0-flash-exp
+
 audio:
   audio_input_file: "poems/machhli_jal_ki_rani_hai.wav"
   lyrics_file: "poems/machhli_jal_ki_rani_hai.txt"
@@ -14,10 +17,12 @@ video:
 
 whisper:
   model: "small" # tiny, base, small, medium, large-v2
+  language: "hi" # Force language code (e.g., "hi", "en"). Remove or leave empty for auto-detection.
 
 imagen:
   model: "imagen-4.0-generate-001" # or imagen-3.0-generate-001
 
 veo:
   enabled: true # Set to true to use Video Generation instead of Image
-  model: "veo-3.1-generate-001"
+  model: "veo-3.1-fast-generate-preview"
+  extension_enabled: false # Set to true to enable video extension logic (experimental)
